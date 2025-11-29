@@ -55,7 +55,7 @@ services:
     user: root
     volumes:
       # Read Docker JSON logs from the host
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /media/tim/docker/containers:/var/lib/docker/containers:ro
       # Provide standalone agent config
       - ./docker/elastic-agent.yml:/usr/share/elastic-agent/elastic-agent.yml:ro
     environment:

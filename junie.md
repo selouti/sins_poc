@@ -520,3 +520,10 @@ container.name : "app_loc1"
 If you want, I can also add a small Lens table (saved visualization) and a dashboard wired to these KQL filters.
 
 ---- Quota Exceeded  -----
+
+Log fields not found in Kibana
+docker inspect --format='{{.LogPath}}' app_loc1
+/media/tim/docker/containers/a50e13f5fe7f9e07499985fb966afdd8a8a41ce0de9ab646b65444910ad5be24/a50e13f5fe7f9e07499985fb966afdd8a8a41ce0de9ab646b65444910ad5be24-json.log
+New file: `docker/elastic-agent.yml` — standalone Agent config to read Docker JSON logs from `/var/lib/docker/containers/*/*.log`
+Updated `docker-compose.yml` 
+labels.stack now found but rest of fields missing.
