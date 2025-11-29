@@ -1,0 +1,171 @@
+version: "3.9"
+
+services:
+  kafka:
+    image: bitnami/kafka:3.6
+    container_name: kafka
+    environment:
+      - KAFKA_ENABLE_KRAFT=true
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9092:9092"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=["http://elasticsearch:9200"]
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  app_loc1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: app_loc1
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc1
+      - ROLE_HEADER=X-Role
+      - FUZZY_HIT_LIMIT=25
+      - RETENTION_DAYS=365
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+      - LOAD_SAMPLE_DATA=1
+    command: ["gunicorn", "-b", "0.0.0.0:8000", "sins.wsgi:application"]
+    ports:
+      - "8001:8000"
+    depends_on:
+      - kafka
+      - elasticsearch
+
+  app_loc2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: app_loc2
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc2
+      - ROLE_HEADER=X-Role
+      - FUZZY_HIT_LIMIT=25
+      - RETENTION_DAYS=365
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+      - LOAD_SAMPLE_DATA=1
+    command: ["gunicorn", "-b", "0.0.0.0:8000", "sins.wsgi:application"]
+    ports:
+      - "8002:8000"
+    depends_on:
+      - kafka
+      - elasticsearch
+
+  app_loc3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: app_loc3
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc3
+      - ROLE_HEADER=X-Role
+      - FUZZY_HIT_LIMIT=25
+      - RETENTION_DAYS=365
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+      - LOAD_SAMPLE_DATA=1
+    command: ["gunicorn", "-b", "0.0.0.0:8000", "sins.wsgi:application"]
+    ports:
+      - "8003:8000"
+    depends_on:
+      - kafka
+      - elasticsearch
+
+  consumer_loc1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: consumer_loc1
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc1
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+    command: ["python", "manage.py", "consume_events"]
+    depends_on:
+      - kafka
+
+  consumer_loc2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: consumer_loc2
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc2
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+    command: ["python", "manage.py", "consume_events"]
+    depends_on:
+      - kafka
+
+  consumer_loc3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: consumer_loc3
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc3
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+    command: ["python", "manage.py", "consume_events"]
+    depends_on:
+      - kafka
+
+  retention_worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: retention_worker
+    environment:
+      - DJANGO_SETTINGS_MODULE=sins.settings
+      - LOCATION_ID=loc1
+      - DEBUG=1
+      - SECRET_KEY=dev-secret
+    command: ["sh", "-c", "while true; do python manage.py cleanup_customers; sleep 86400; done"]
+    depends_on:
+      - app_loc1
+
+volumes:
+  esdata:

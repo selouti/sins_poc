@@ -1,0 +1,112 @@
+[
+  {
+    "model": "customers.customer",
+    "pk": 1,
+    "fields": {
+      "surname": "Smith",
+      "name": "John",
+      "dob": "1985-03-12",
+      "document_number": "A1234567",
+      "extra_fields": {"middle_name": "Andrew", "notes": "VIP"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 2,
+    "fields": {
+      "surname": "Smyth",
+      "name": "Jon",
+      "dob": "1986-07-22",
+      "document_number": "A1234568",
+      "extra_fields": {"notes": "typo twin for fuzzy"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 3,
+    "fields": {
+      "surname": "Johnson",
+      "name": "Alice",
+      "dob": "1990-11-05",
+      "document_number": "B9876543",
+      "extra_fields": {"alt_phone": "+44 20 7946 0000"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 4,
+    "fields": {
+      "surname": "Johnsen",
+      "name": "Alyce",
+      "dob": "1991-01-15",
+      "document_number": "B9876544",
+      "extra_fields": {"notes": "fuzzy similar to Alice Johnson"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 5,
+    "fields": {
+      "surname": "Garcia",
+      "name": "Maria",
+      "dob": "1979-08-30",
+      "document_number": "C5555555",
+      "extra_fields": {"alt_phone": "+1 212 555 0101"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 6,
+    "fields": {
+      "surname": "García",
+      "name": "María",
+      "dob": "1979-08-30",
+      "document_number": "C5555556",
+      "extra_fields": {"notes": "accented variant"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 7,
+    "fields": {
+      "surname": "O'Connor",
+      "name": "Seán",
+      "dob": "1982-02-02",
+      "document_number": "D0000001",
+      "extra_fields": {"middle_name": "Patrick"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 8,
+    "fields": {
+      "surname": "Lee",
+      "name": "Wei",
+      "dob": "1995-12-12",
+      "document_number": "E2222222",
+      "extra_fields": {"notes": "common surname to test search volume"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 9,
+    "fields": {
+      "surname": "Li",
+      "name": "Wei",
+      "dob": "1996-06-06",
+      "document_number": "E2222223",
+      "extra_fields": {"notes": "similar to Lee Wei"}
+    }
+  },
+  {
+    "model": "customers.customer",
+    "pk": 10,
+    "fields": {
+      "surname": "Brown",
+      "name": "Charlie",
+      "dob": "2001-10-10",
+      "document_number": "F1010101",
+      "extra_fields": {"notes": "Peanuts"}
+    }
+  }
+]

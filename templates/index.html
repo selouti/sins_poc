@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sins_poc</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    input, button { padding: .5rem; }
+    .small { color: #666; font-size: .9em; }
+    pre { background: #f7f7f7; padding: 1rem; }
+  </style>
+  <script>
+    async function doSearch(ev) {
+      ev.preventDefault();
+      const q = document.getElementById('q').value;
+      const mode = document.getElementById('mode').value;
+      const resp = await fetch(`/api/customers/items/search?q=${encodeURIComponent(q)}&mode=${mode}`, {
+        headers: { 'X-Role': document.getElementById('role').value }
+      });
+      const json = await resp.json();
+      document.getElementById('out').textContent = JSON.stringify(json, null, 2);
+    }
+  </script>
+</head>
+<body>
+  <h1>sins_poc</h1>
+  <p class="small">Role via header <code>X-Role</code>. Choose: <code>customer</code>, <code>service_agent</code>, or <code>service_provider</code>.</p>
+  <form onsubmit="doSearch(event)">
+    <label>Role <input id="role" value="customer" /></label>
+    <br/>
+    <label>Query <input id="q" placeholder="surname name or document number" /></label>
+    <label>Mode 
+      <select id="mode">
+        <option value="exact">exact</option>
+        <option value="fuzzy">fuzzy</option>
+      </select>
+    </label>
+    <button type="submit">Search</button>
+  </form>
+  <pre id="out"></pre>
+  <p class="small">API base: <code>/api/customers/</code>. Admin: <code>/admin/</code></p>
+</body>
+</html>

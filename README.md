@@ -42,3 +42,140 @@ https, python, kafka, ELK.
 
 # environment
 containers
+
+---
+
+# Quick start (MVP generated from this README)
+
+This repository now includes a runnable Django application implementing the user stories below with:
+
+- Django + Django REST Framework HTTP API
+- Minimal web UI (index page with search form)
+- Roles via simple request header `X-Role`: `customer`, `service_agent`, `service_provider`
+- Customers CRUD, dynamic fields, exact and fuzzy search (configurable hit limit)
+- Audit logging of transactions
+- Kafka event publishing and consumers for multi-location synchronization (3 locations)
+- Docker Compose stack with Kafka, Elasticsearch, and Kibana
+
+## Run locally with Docker
+
+Prerequisites: Docker and Docker Compose.
+
+1) Build and start the stack (3 app instances + Kafka + Elasticsearch + Kibana):
+
+```
+docker compose up --build
+```
+
+2) Access the three locations:
+
+- loc1: http://localhost:8001/
+- loc2: http://localhost:8002/
+- loc3: http://localhost:8003/
+
+Kibana: http://localhost:5601/ (Elasticsearch at http://localhost:9200/)
+
+3) API base (all locations):
+
+- `GET/POST /api/customers/items/` — list/create customers (role: service_agent or service_provider to write)
+- `GET/PUT/PATCH/DELETE /api/customers/items/{id}/` — retrieve/update/delete
+- `GET /api/customers/items/search?q=...&mode=exact|fuzzy&limit=...` — search
+- `GET/POST /api/customers/fields/` — list/add fields (role: service_provider)
+- `PUT/PATCH/DELETE /api/customers/fields/{id}/` — update/remove fields (role: service_provider)
+
+Set `X-Role` header to one of `customer`, `service_agent`, or `service_provider`.
+
+4) Minimal UI
+
+Open a location (e.g., loc1) in browser and use the search form. The UI sends the `X-Role` header.
+
+### Sample data
+
+The Compose services are configured to auto‑load sample data on first start. You can also load them manually:
+
+```
+# Load fixtures directly
+python manage.py loaddata customers/fixtures/fields.json customers/fixtures/customers.json
+
+# Or use the idempotent seeder (also used by Docker entrypoint when LOAD_SAMPLE_DATA=1)
+python manage.py load_sample_data --extras 20
+```
+
+Quick smoke test (from your host shell):
+
+```
+# List customers (read access with any role)
+curl -s http://localhost:8001/api/customers/items/ -H 'X-Role: customer' | jq .
+
+# Exact search (multiple terms are AND-ed across surname/name/document_number)
+curl -s 'http://localhost:8001/api/customers/items/search?q=Alice%20Johnson&mode=exact' -H 'X-Role: customer' | jq .
+
+# Fuzzy search (typo tolerant, limited by FUZZY_HIT_LIMIT)
+curl -s 'http://localhost:8001/api/customers/items/search?q=Alyce%20Johnsen&mode=fuzzy' -H 'X-Role: customer' | jq .
+```
+
+To create/update/delete customers, use `X-Role: service_agent` (or `service_provider`).
+
+5) Multi‑location sync
+
+- Any create/update/delete in one location emits a Kafka event.
+- Background consumers (one per location) apply events idempotently so the three locations stay in sync.
+
+6) Data retention
+
+- A simple worker runs `manage.py cleanup_customers` once a day to delete customers older than `RETENTION_DAYS` (default 365).
+
+## Configuration
+
+Environment variables (see defaults in `sins/settings.py`):
+
+- `LOCATION_ID` — identifier for the running instance (loc1/loc2/loc3)
+- `ROLE_HEADER` — request header carrying role (default `X-Role`)
+- `FUZZY_HIT_LIMIT` — max results for fuzzy search (default 25)
+- `RETENTION_DAYS` — retention period for customers (default 365)
+- `KAFKA_BOOTSTRAP` — Kafka bootstrap (default `kafka:9092`)
+- `ELASTICSEARCH_HOST` — Elasticsearch URL (default empty, not required)
+- `DEBUG`, `SECRET_KEY` — standard Django settings
+
+Sample‑data options:
+
+- `LOAD_SAMPLE_DATA` — when set to `1`, the entrypoint runs `python manage.py load_sample_data` after migrations. This is enabled for the three app services in `docker-compose.yml`.
+
+You can also create a `.env` file at project root and set values; it will be read by the app.
+
+## Development (without Docker)
+
+1) Python 3.12 recommended. Create a virtualenv and install deps:
+
+```
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2) Initialize DB and runserver:
+
+```
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
+
+3) Optional: run the Kafka consumer in another shell:
+
+```
+python manage.py consume_events
+```
+
+## Notes
+
+- This PoC uses header-based roles for simplicity. Replace with real auth as needed.
+- Fuzzy search uses RapidFuzz; tune `FUZZY_HIT_LIMIT` per service_provider.
+- Logs are JSON-formatted to stdout; Elasticsearch/Kibana are provided to explore data, but log shipping is not wired via Logstash/Beats in this PoC.
+
+### Admin
+
+The Django admin is available at `/admin/`. Create a superuser in dev if needed:
+
+```
+python manage.py createsuperuser
+```

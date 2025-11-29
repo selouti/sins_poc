@@ -1,0 +1,17 @@
+[
+  {
+    "model": "customers.fielddefinition",
+    "pk": 1,
+    "fields": {"key": "middle_name", "label": "Middle name", "active": true}
+  },
+  {
+    "model": "customers.fielddefinition",
+    "pk": 2,
+    "fields": {"key": "alt_phone", "label": "Alternate phone", "active": true}
+  },
+  {
+    "model": "customers.fielddefinition",
+    "pk": 3,
+    "fields": {"key": "notes", "label": "Notes", "active": true}
+  }
+]
