@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover
 
 
 _producer = None
+_last_error = None
 
 
 def get_producer():
@@ -25,9 +26,10 @@ def get_producer():
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             )
         except Exception as e:  # pragma: no cover
+            # Do not permanently disable; allow future retries on next call
             logger.warning("Kafka unavailable: %s", e)
-            _producer = False
-    return _producer if _producer is not False else None
+            _producer = None
+    return _producer
 
 
 def emit_event(topic: str, event_id: str, event_type: str, entity_id: str, location_id: str, payload: Dict[str, Any]):

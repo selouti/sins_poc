@@ -55,7 +55,7 @@ This repository now includes a runnable Django application implementing the user
 - Customers CRUD, dynamic fields, exact and fuzzy search (configurable hit limit)
 - Audit logging of transactions
 - Kafka event publishing and consumers for multi-location synchronization (3 locations)
-- Docker Compose stack with Kafka, Elasticsearch, and Kibana
+- Docker Compose stack with Kafka (Apache kafka-native, KRaft single-node; no ZooKeeper), Elasticsearch, and Kibana
 
 ## Run locally with Docker
 
@@ -74,6 +74,14 @@ docker compose up --build
 - loc3: http://localhost:8003/
 
 Kibana: http://localhost:5601/ (Elasticsearch at http://localhost:9200/)
+
+Note: The stack uses the official Apache `apache/kafka-native` image running in KRaft (no ZooKeeper). If you ever need a clean broker state, stop the stack and prune the `kafkadata` volume:
+
+```
+docker compose down
+docker volume rm sins_poc_kafkadata || true
+docker compose up --build
+```
 
 3) API base (all locations):
 
@@ -99,6 +107,17 @@ python manage.py loaddata customers/fixtures/fields.json customers/fixtures/cust
 
 # Or use the idempotent seeder (also used by Docker entrypoint when LOAD_SAMPLE_DATA=1)
 python manage.py load_sample_data --extras 20
+```
+
+Troubleshooting auto‑load:
+
+- The container entrypoint checks `LOAD_SAMPLE_DATA` (or `load_sample_data`) and accepts truthy values: `1`, `true`, `yes`, `on` (case‑insensitive).
+- On startup it logs a line like `[entrypoint] LOAD_SAMPLE_DATA=1 → running python manage.py load_sample_data` in `app_loc{N}` logs.
+- If you don't see this, set the variable in `docker-compose.yml` (already set for all three apps) or in your `.env`.
+- You can also run seeding manually inside a container:
+
+```
+docker compose exec app_loc1 python manage.py load_sample_data --extras 10
 ```
 
 Quick smoke test (from your host shell):
@@ -140,6 +159,7 @@ Environment variables (see defaults in `sins/settings.py`):
 Sample‑data options:
 
 - `LOAD_SAMPLE_DATA` — when set to `1`, the entrypoint runs `python manage.py load_sample_data` after migrations. This is enabled for the three app services in `docker-compose.yml`.
+  - Accepted truthy values: `1`, `true`, `yes`, `on` (case‑insensitive). You may also use `load_sample_data` variable name.
 
 You can also create a `.env` file at project root and set values; it will be read by the app.
 

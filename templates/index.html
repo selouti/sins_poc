@@ -21,6 +21,134 @@
       const json = await resp.json();
       document.getElementById('out').textContent = JSON.stringify(json, null, 2);
     }
+
+    function roleHeader() {
+      return { 'X-Role': document.getElementById('role').value };
+    }
+
+    function parseExtraFields(inputId) {
+      const raw = document.getElementById(inputId).value.trim();
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch (e) {
+        alert('extra_fields must be valid JSON');
+        throw e;
+      }
+    }
+
+    function setOut(data) {
+      document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function listCustomers() {
+      const resp = await fetch('/api/customers/items/', { headers: roleHeader() });
+      setOut(await resp.json());
+    }
+
+    async function createCustomer(ev) {
+      ev.preventDefault();
+      const payload = {
+        surname: document.getElementById('c_surname').value,
+        name: document.getElementById('c_name').value,
+        dob: document.getElementById('c_dob').value || null,
+        document_number: document.getElementById('c_doc').value,
+        extra_fields: parseExtraFields('c_extra')
+      };
+      const resp = await fetch('/api/customers/items/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...roleHeader() },
+        body: JSON.stringify(payload)
+      });
+      setOut(await resp.json());
+    }
+
+    async function updateCustomer(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('u_id').value.trim();
+      if (!id) { alert('Provide id'); return; }
+      const payload = {};
+      const s = document.getElementById('u_surname').value; if (s) payload.surname = s;
+      const n = document.getElementById('u_name').value; if (n) payload.name = n;
+      const d = document.getElementById('u_dob').value; if (d) payload.dob = d;
+      const dn = document.getElementById('u_doc').value; if (dn) payload.document_number = dn;
+      const ex = document.getElementById('u_extra').value.trim(); if (ex) payload.extra_fields = parseExtraFields('u_extra');
+      if (Object.keys(payload).length === 0) { alert('Provide at least one field to update'); return; }
+      const resp = await fetch(`/api/customers/items/${encodeURIComponent(id)}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...roleHeader() },
+        body: JSON.stringify(payload)
+      });
+      setOut(await resp.json());
+    }
+
+    async function deleteCustomer(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('d_id').value.trim();
+      if (!id) { alert('Provide id'); return; }
+      const resp = await fetch(`/api/customers/items/${encodeURIComponent(id)}/`, {
+        method: 'DELETE',
+        headers: roleHeader()
+      });
+      if (resp.status === 204) {
+        setOut({ detail: `Deleted id ${id}` });
+      } else {
+        setOut(await resp.json());
+      }
+    }
+
+    // -------- Dynamic Fields (service_provider) --------
+    async function listFields() {
+      const resp = await fetch('/api/customers/fields/', { headers: roleHeader() });
+      setOut(await resp.json());
+    }
+
+    async function createField(ev) {
+      ev.preventDefault();
+      const payload = {
+        key: document.getElementById('f_key').value.trim(),
+        label: document.getElementById('f_label').value.trim(),
+        active: document.getElementById('f_active').checked,
+      };
+      if (!payload.key || !payload.label) { alert('key and label are required'); return; }
+      const resp = await fetch('/api/customers/fields/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...roleHeader() },
+        body: JSON.stringify(payload)
+      });
+      setOut(await resp.json());
+    }
+
+    async function updateField(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('fu_id').value.trim();
+      if (!id) { alert('Provide id'); return; }
+      const payload = {};
+      const k = document.getElementById('fu_key').value.trim(); if (k) payload.key = k;
+      const l = document.getElementById('fu_label').value.trim(); if (l) payload.label = l;
+      const aChk = document.getElementById('fu_active');
+      if (aChk.indeterminate === false) { payload.active = aChk.checked; }
+      if (Object.keys(payload).length === 0) { alert('Provide at least one field to update'); return; }
+      const resp = await fetch(`/api/customers/fields/${encodeURIComponent(id)}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...roleHeader() },
+        body: JSON.stringify(payload)
+      });
+      setOut(await resp.json());
+    }
+
+    async function deleteField(ev) {
+      ev.preventDefault();
+      const id = document.getElementById('fd_id').value.trim();
+      if (!id) { alert('Provide id'); return; }
+      const resp = await fetch(`/api/customers/fields/${encodeURIComponent(id)}/`, {
+        method: 'DELETE',
+        headers: roleHeader()
+      });
+      if (resp.status === 204) {
+        setOut({ detail: `Deleted field id ${id}` });
+      } else {
+        setOut(await resp.json());
+      }
+    }
   </script>
 </head>
 <body>
@@ -38,6 +166,83 @@
     </label>
     <button type="submit">Search</button>
   </form>
+  <hr/>
+
+  <div>
+    <h3>Customers (CUD)</h3>
+    <button onclick="listCustomers()">List customers</button>
+    <h4>Create</h4>
+    <form onsubmit="createCustomer(event)">
+      <label>Surname <input id="c_surname" required /></label>
+      <label>Name <input id="c_name" required /></label>
+      <label>DOB <input id="c_dob" type="date" /></label>
+      <label>Document # <input id="c_doc" /></label>
+      <br/>
+      <label>extra_fields (JSON) <textarea id="c_extra" rows="3" cols="50" placeholder='{"notes":"VIP"}'></textarea></label>
+      <br/>
+      <button type="submit">Create customer</button>
+    </form>
+
+    <h4>Update (PATCH)</h4>
+    <form onsubmit="updateCustomer(event)">
+      <label>Id <input id="u_id" required /></label>
+      <label>Surname <input id="u_surname" /></label>
+      <label>Name <input id="u_name" /></label>
+      <label>DOB <input id="u_dob" type="date" /></label>
+      <label>Document # <input id="u_doc" /></label>
+      <br/>
+      <label>extra_fields (JSON) <textarea id="u_extra" rows="3" cols="50" placeholder='{"notes":"updated"}'></textarea></label>
+      <br/>
+      <button type="submit">Update customer</button>
+    </form>
+
+    <h4>Delete</h4>
+    <form onsubmit="deleteCustomer(event)">
+      <label>Id <input id="d_id" required /></label>
+      <button type="submit">Delete customer</button>
+    </form>
+  </div>
+
+  <hr/>
+  <div>
+    <h3>Dynamic fields (service_provider)</h3>
+    <p class="small">Requires Role = <code>service_provider</code>. Manage definitions used inside <code>extra_fields</code>.</p>
+    <button onclick="listFields()">List fields</button>
+
+    <h4>Create field</h4>
+    <form onsubmit="createField(event)">
+      <label>key <input id="f_key" placeholder="e.g. notes" required /></label>
+      <label>label <input id="f_label" placeholder="e.g. Notes" required /></label>
+      <label><input type="checkbox" id="f_active" checked /> active</label>
+      <button type="submit">Create field</button>
+    </form>
+
+    <h4>Update field (PATCH)</h4>
+    <form onsubmit="updateField(event)">
+      <label>id <input id="fu_id" required /></label>
+      <label>key <input id="fu_key" placeholder="new key (optional)" /></label>
+      <label>label <input id="fu_label" placeholder="new label (optional)" /></label>
+      <label>
+        <input type="checkbox" id="fu_active" /> active
+        <span class="small">(leave unchecked and indeterminate to skip updating). </span>
+      </label>
+      <script>
+        // Make fu_active tri-state-ish: start indeterminate so we can detect "not provided"
+        document.addEventListener('DOMContentLoaded', () => {
+          const chk = document.getElementById('fu_active');
+          chk.indeterminate = true;
+          chk.addEventListener('click', () => { if (chk.indeterminate) chk.indeterminate = false; });
+        });
+      </script>
+      <button type="submit">Update field</button>
+    </form>
+
+    <h4>Delete field</h4>
+    <form onsubmit="deleteField(event)">
+      <label>id <input id="fd_id" required /></label>
+      <button type="submit">Delete field</button>
+    </form>
+  </div>
   <pre id="out"></pre>
   <p class="small">API base: <code>/api/customers/</code>. Admin: <code>/admin/</code></p>
 </body>

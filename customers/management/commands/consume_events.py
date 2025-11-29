@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from audit.models import AppliedEvent
@@ -16,18 +17,36 @@ except Exception:  # pragma: no cover
 class Command(BaseCommand):
     help = "Consume Kafka events to sync customers across locations"
 
-    def handle(self, *args, **options):
+    def _connect_with_retry(self, max_wait: int = 60):
         if KafkaConsumer is None:
             self.stdout.write(self.style.WARNING("Kafka not available; exiting consumer."))
+            return None
+        delay = 1.0
+        total = 0.0
+        while True:
+            try:
+                consumer = KafkaConsumer(
+                    "customer.events",
+                    bootstrap_servers=settings.KAFKA_BOOTSTRAP,
+                    value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+                    auto_offset_reset="earliest",
+                    enable_auto_commit=True,
+                    group_id=f"sins_consumer_{settings.LOCATION_ID}",
+                )
+                return consumer
+            except Exception as e:  # pragma: no cover
+                logger.warning("Kafka consumer connect failed (%s). Retrying in %.1fs", e, delay)
+                time.sleep(delay)
+                total += delay
+                delay = min(delay * 2, 10.0)
+                if total >= max_wait:
+                    # keep retrying, but log less frequently
+                    total = 0.0
+
+    def handle(self, *args, **options):
+        consumer = self._connect_with_retry()
+        if consumer is None:
             return
-        consumer = KafkaConsumer(
-            "customer.events",
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP,
-            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-            auto_offset_reset="earliest",
-            enable_auto_commit=True,
-            group_id=f"sins_consumer_{settings.LOCATION_ID}",
-        )
         self.stdout.write(self.style.SUCCESS("Consumer started"))
         for msg in consumer:
             evt = msg.value
