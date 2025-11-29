@@ -332,3 +332,191 @@ This avoids CLI dependencies at the cost of being less semantic.
 ### Why this works
 - Your broker log shows it started; the earlier unhealthy state was caused solely by a healthcheck command that didn’t exist in the image.
 - Removing the brittle healthcheck plus leveraging robust retry logic ensures the stack comes up reliably across image/tag differences.
+
+# Kibana UI empty
+## Diagnosis
+- The Kibana “Integrations” app depends on Fleet/Elastic Agent (managed mode). Our stack runs Elasticsearch and Kibana with security disabled and no Fleet setup, so the Integrations page can hang or never complete setup. That doesn’t block log exploration via Discover.
+- Additionally, we hadn’t wired any log shipper (Beats/Elastic Agent/Logstash), so there were no indices to explore.
+
+### What I changed
+- Added a lightweight Elastic Agent (standalone mode) to ship Docker container logs to Elasticsearch, so you can explore logs in Kibana Discover without using the Integrations UI.
+- Changes:
+  - New file: `docker/elastic-agent.yml` — standalone Agent config to read Docker JSON logs from `/var/lib/docker/containers/*/*.log`, parse container metadata, and send to `http://elasticsearch:9200`.
+  - Updated `docker-compose.yml`:
+    - Added `elastic-agent` service using `docker.elastic.co/beats/elastic-agent:8.15.3` with required mounts and restart policy.
+    - Made app services depend on `elastic-agent` to ensure logs are ingested early.
+
+### How to use
+1) Recreate the stack (adds the agent):
+```
+docker compose up -d --build elasticsearch kibana elastic-agent
+# or the whole stack
+docker compose up -d --build
+```
+
+2) Verify ingestion in Elasticsearch:
+```
+curl -s http://localhost:9200/_data_stream | jq . | head
+curl -s http://localhost:9200/_cat/indices?v | grep logs-
+```
+You should see data streams/indices like `logs-docker.logs-default`.
+
+3) Open Kibana Discover (skip Integrations):
+- Go to http://localhost:5601/app/discover
+- Create a Data View matching `logs-*` (time field `@timestamp`).
+- You should now see live container logs from the stack.
+
+4) Optional health probes:
+```
+# Kibana status
+curl -s http://localhost:5601/api/status | jq .status.overall
+# Agent self-monitoring
+curl -s http://localhost:5066
+```
+
+### Notes & caveats
+- Integrations may still appear to hang because Fleet isn’t configured. That’s expected and safe to ignore for this PoC. Use Discover/Dev Tools for exploration.
+- The agent config reads Docker JSON logs from `/var/lib/docker/containers`. This works on Linux hosts. On Docker Desktop (macOS/Windows), this path isn’t directly available; if you’re on Desktop and don’t see logs, tell me and I’ll switch the agent to use Docker socket-based inputs.
+- Logs are shipped as-is; we can add processors to promote JSON fields (e.g., `message`, `level`, `logger`, `location_id`) for richer querying on demand.
+
+### Next steps for you
+1) Bring up the updated services and wait ~30–60s.
+2) Create the `logs-*` data view in Kibana and open Discover.
+3) If you still prefer a healthcheck-based approach or want Fleet for the Integrations UI, I can enable security and set up Fleet Server as a follow-up.
+
+### Goal
+Show customer creations and changes (updates) in Kibana using KQL against your container logs shipped by Elastic Agent.
+
+Given the current setup, logs are ingested from Docker JSON logs as plain text; the safest filter is to match the producer log line your app emits on mutations:
+- The producer logs: `kafka.emit topic=customer.events event_type=...`
+- We’ll filter for `event_type=customer_created` (create) or `event_type=customer_updated` (update).
+
+### Prerequisites (one‑time)
+- In Kibana, create a Data View for `logs-*` with time field `@timestamp` (Discover → Data Views).
+
+### KQL you can paste into Discover
+Use any of the following, then set your time range as needed (e.g., Last 24 hours).
+
+#### Only creations
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+message : "kafka.emit" and
+message : "topic=customer.events" and
+message : "event_type=customer_created"
+```
+
+#### Only updates (changes)
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+message : "kafka.emit" and
+message : "topic=customer.events" and
+message : "event_type=customer_updated"
+```
+
+#### Creations OR updates
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+message : "kafka.emit" and
+message : "topic=customer.events" and
+(
+  message : "event_type=customer_created" or
+  message : "event_type=customer_updated"
+)
+```
+
+#### Optional: filter by a specific location
+Replace the container clause with the one for the location you want:
+- loc1 only: `container.name : "app_loc1"`
+- loc2 only: `container.name : "app_loc2"`
+- loc3 only: `container.name : "app_loc3"`
+
+#### Optional: include deletes too
+```
+... and (
+  message : "event_type=customer_created" or
+  message : "event_type=customer_updated" or
+  message : "event_type=customer_deleted"
+)
+```
+
+### Suggested columns in Discover
+- `@timestamp`
+- `container.name`
+- `message`
+
+Save this as a Saved Search, then you can:
+- Create a Lens table viz using the same KQL and columns
+- Add it to a dashboard for quick monitoring
+
+### Why this works
+- Your Django app logs are JSON‑formatted to stdout, but Elastic Agent currently ships them as plain text. The producer’s info log contains a stable textual marker: `kafka.emit topic=customer.events event_type=...`.
+- Every create/update triggers that log, so KQL text search reliably finds customer creations/changes across locations.
+
+### Future improvement (optional)
+If you want richer fields (e.g., `logger`, `level`, `event_type` as a first‑class field):
+- Enhance `docker/elastic-agent.yml` to parse inner JSON from `message` and map fields. Then you could use more structured KQL like:
+```
+labels.stack : "sins_poc" and
+(log.logger : "sins.kafka_utils" or logger : "sins.kafka_utils") and
+(event_type : ("customer_created","customer_updated"))
+```
+- Or, index `audit.AuditLog` rows to an `audit-logs-*` index and query by `action : (create or update)` and `entity : customer`.
+
+If you want, I can commit the JSON parsing change for the agent so you get clickable fields (event_type, logger, level) in Discover.
+
+### What I changed
+- Enabled JSON parsing of your app’s structured logs in `docker/elastic-agent.yml` so Kibana gets first‑class fields (logger, level, event_type → event.action).
+- Added processors:
+  - `decode_json_fields` on `message`/`log` to extract the inner JSON from python‑json‑logger.
+  - `rename` to map `name` → `log.logger` and `levelname` → `log.level` (ECS‑ish).
+  - `copy_fields` to expose `event_type` as `event.action` for easy KQL.
+
+### How to apply
+1) Recreate/refresh the agent (fast):
+```
+docker compose up -d --build elastic-agent
+# or if already running
+docker compose restart elastic-agent
+```
+2) In Kibana Discover:
+- Ensure your Data View is `logs-*` with time field `@timestamp`.
+
+### KQL (after parsing)
+- Creations only:
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+(event.action : "customer_created")
+```
+- Updates only:
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+(event.action : "customer_updated")
+```
+- Creations OR updates:
+```
+labels.stack : "sins_poc" and
+container.name : ("app_loc1" or "app_loc2" or "app_loc3") and
+(event.action : ("customer_created" or "customer_updated"))
+```
+- Optional: by logger and include deletes:
+```
+labels.stack : "sins_poc" and
+log.logger : "sins.kafka_utils" and
+(event.action : ("customer_created" or "customer_updated" or "customer_deleted"))
+```
+- Optional: only a specific location:
+```
+container.name : "app_loc1"
+```
+### Notes
+- If you still see only raw `message` and not `event.action`, wait ~30–60s after agent restart; confirm new events arrive (the processors only affect new ingested lines).
+- You can customize which fields appear in Discover by setting columns to `@timestamp`, `container.name`, `event.action`, `log.logger`, and `message`.
+
+If you want, I can also add a small Lens table (saved visualization) and a dashboard wired to these KQL filters.
+
+---- Quota Exceeded  -----

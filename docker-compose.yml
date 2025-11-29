@@ -48,6 +48,24 @@ services:
     depends_on:
       - elasticsearch
 
+  # Lightweight log ingestion so you can explore logs in Kibana Discover without Fleet/Integrations
+  elastic-agent:
+    image: docker.elastic.co/beats/elastic-agent:8.15.3
+    container_name: elastic-agent
+    user: root
+    volumes:
+      # Read Docker JSON logs from the host
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Provide standalone agent config
+      - ./docker/elastic-agent.yml:/usr/share/elastic-agent/elastic-agent.yml:ro
+    environment:
+      - ELASTIC_AGENT_CLOUD=false
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    ports:
+      - "5066:5066"  # agent monitoring endpoint (optional)
+
   app_loc1:
     build:
       context: .
@@ -70,6 +88,7 @@ services:
     depends_on:
       - kafka
       - elasticsearch
+      - elastic-agent
 
   app_loc2:
     build:
@@ -93,6 +112,7 @@ services:
     depends_on:
       - kafka
       - elasticsearch
+      - elastic-agent
 
   app_loc3:
     build:
@@ -116,6 +136,7 @@ services:
     depends_on:
       - kafka
       - elasticsearch
+      - elastic-agent
 
   consumer_loc1:
     build:
