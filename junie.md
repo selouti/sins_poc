@@ -558,3 +558,8 @@ In conclusion, I asked for an ELK based solution and got a Django based one.
    https://docs.lenses.io/latest/deployment/installation/docker/hq
    - Requires Postgres. Update docker-compose.yml to use Postgres.
 [] See if kafka can be configured to pick Django logs and send them to ELK.
+
+
+Problem after Timeshift. 
+target app_loc3: failed to solve: failed to prepare c2x9de7xu1anj06tf9o3vovyh as wtwuquh819t154k9hdidos4fd: parent snapshot c2x9de7xu1anj06tf9o3vovyh does not exist: not found
+Lesson learnt: a git of docker project is not truely portable?
