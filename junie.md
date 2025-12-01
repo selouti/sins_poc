@@ -527,3 +527,34 @@ docker inspect --format='{{.LogPath}}' app_loc1
 New file: `docker/elastic-agent.yml` — standalone Agent config to read Docker JSON logs from `/var/lib/docker/containers/*/*.log`
 Updated `docker-compose.yml` 
 labels.stack now found but rest of fields missing.
+[] Check kafka logs --> sudo tail -f /media/tim/docker/containers/4a981e05e018dfb7a7ae586e341cebfae3545c0dfc9a978c2ab13491bb399cae/4a981e05e018dfb7a7ae586e341cebfae3545c0dfc9a978c2ab13491bb399cae-json.log
+[] Create traffic - query, no log. list cust, no log. create cust, no log.
+[] What is kafka doing? Looking for internal logs
+   4a981e05e018:/$ cat /opt/kafka/config/server.properties
+   log.dirs=/var/lib/kafka/data
+   4a981e05e018:/var/lib/kafka/data/customer.events-0$ ls -l
+total 8
+-rw-r--r--    1 appuser  appuser   10485760 Nov 30 09:45 00000000000000000000.index
+-rw-r--r--    1 appuser  appuser          0 Nov 29 17:52 00000000000000000000.log
+-rw-r--r--    1 appuser  appuser   10485756 Nov 30 09:45 00000000000000000000.timeindex
+-rw-r--r--    1 appuser  appuser          8 Nov 30 09:45 leader-epoch-checkpoint
+-rw-r--r--    1 appuser  appuser         43 Nov 29 17:52 partition.metadata
+  Log and index unreadable.
+[] Kafka UI? Lenses? Lens was mentioned by Junie but not configured. 
+[] What is django doing? The py report missing packages? The app appears to be working.
+[] Is the data in sqlite? Don't find sqlite3. It's inside the app_ dockers but I can't open this file.
+   -rw-r--r-- 1 root root 151552 Nov 30 09:52 db.sqlite3
+     File "/usr/local/lib/python3.12/site-packages/django/db/backends/sqlite3/base.py", line 360, in execute
+2025-11-30T09:52:11.282668682Z     return super().execute(query, params)
+2025-11-30T09:52:11.282671375Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-11-30T09:52:11.282674083Z sqlite3.OperationalError: no such table: audit_auditlog
+[] Is the customer date in ELK? Nothing to show it is and no apparent connection between the app and ELK.
+
+In conclusion, I asked for an ELK based solution and got a Django based one.
+
+# Todo
+[] Configure Kafka UI
+   https://docs.lenses.io/latest/getting-started/connecting-lenses-to-your-environment/overview#postgres
+   https://docs.lenses.io/latest/deployment/installation/docker/hq
+   - Requires Postgres. Update docker-compose.yml to use Postgres.
+[] See if kafka can be configured to pick Django logs and send them to ELK.
